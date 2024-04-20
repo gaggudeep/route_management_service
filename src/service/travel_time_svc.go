@@ -36,7 +36,7 @@ func (s TravelTimeServiceImpl) CalculateTravelTime(agent entity.DeliveryAgent,
 
 	travelTime := distance.Value / agent.AverageSpeed.Value
 	travel := helper.RoundTo(travelTime, s.cfg.CalculationConfig.DistancePrecisionDecimals)
-	durationString := fmt.Sprintf("%f%s", travel, s.cfg.CalculationConfig.DistanceUnit)
+	durationString := fmt.Sprintf("%f%s", travel, s.cfg.CalculationConfig.DurationUnit)
 	duration, err := time.ParseDuration(durationString)
 
 	if err != nil {

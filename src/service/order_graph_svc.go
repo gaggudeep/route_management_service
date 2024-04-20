@@ -23,7 +23,7 @@ func NewOrderGraphSvvImpl(travelTimeSvc TravelTimeSvc, distanceTimeSvc DistanceS
 func (s OrderGraphSvcImpl) ConstructGraph(agent entity.DeliveryAgent,
 	orders []entity.Order) (entity.Graph[time.Duration], error) {
 	nodes := constructNodes(agent, orders)
-	edges, err := s.constructEdges(agent, nodes, orders)
+	edges, err := s.constructEdges(agent, nodes)
 
 	if err != nil {
 		log.Printf("[ERROR] error from travel time svc: %s", err.Error())
@@ -36,10 +36,9 @@ func (s OrderGraphSvcImpl) ConstructGraph(agent entity.DeliveryAgent,
 	}, nil
 }
 
-func (s OrderGraphSvcImpl) constructEdges(agent entity.DeliveryAgent, nodes []entity.Node[time.Duration],
-	orders []entity.Order) ([][]entity.Edge[time.Duration], error) {
+func (s OrderGraphSvcImpl) constructEdges(agent entity.DeliveryAgent,
+	nodes []entity.Node[time.Duration]) ([][]entity.Edge[time.Duration], error) {
 	adj := make([][]entity.Edge[time.Duration], 0, len(nodes))
-	consumersMap := constructConsumersMap(orders)
 
 	for i := 0; i < len(nodes); i++ {
 		src := nodes[i]
@@ -47,40 +46,20 @@ func (s OrderGraphSvcImpl) constructEdges(agent entity.DeliveryAgent, nodes []en
 		adj = append(adj, []entity.Edge[time.Duration]{})
 		for j := 0; j < len(nodes); j++ {
 			dest := nodes[j]
+			dist := s.distanceSvc.CalculateDistance(src.GeoCoordinates, dest.GeoCoordinates)
+			travelTime, err := s.travelTimeSvc.CalculateTravelTime(agent, dist)
 
-			if isConnected(src, dest, consumersMap) {
-				dist := s.distanceSvc.CalculateDistance(src.GeoCoordinates, dest.GeoCoordinates)
-				travelTime, err := s.travelTimeSvc.CalculateTravelTime(agent, dist)
-
-				if err != nil {
-					return nil, err
-				}
-				adj[i] = append(adj[i], entity.Edge[time.Duration]{
-					DestinationNodeId: j,
-					Cost:              travelTime + dest.OverheadCost,
-				})
+			if err != nil {
+				return nil, err
 			}
+			adj[i] = append(adj[i], entity.Edge[time.Duration]{
+				DestinationNodeId: j,
+				Cost:              travelTime + dest.OverheadCost,
+			})
 		}
 	}
 
 	return adj, nil
-}
-
-/*
-isConnected any restaurant can be visited from any node (agent, other restaurant, consumer)
-but a consumer can only be visited from a particular restaurant
-*/
-func isConnected(src entity.Node[time.Duration], dest entity.Node[time.Duration],
-	consumerMap map[int]map[int]bool) bool {
-	if dest.OriginalNode.GetType() == entity.NodeTypeRestaurant {
-		return true
-	}
-
-	consumersSet, ok := consumerMap[src.OriginalNode.GetId()]
-	if !ok {
-		return false
-	}
-	return consumersSet[dest.OriginalNode.GetId()]
 }
 
 func constructNodes(agent entity.DeliveryAgent, orders []entity.Order) []entity.Node[time.Duration] {
@@ -105,25 +84,10 @@ func constructNodes(agent entity.DeliveryAgent, orders []entity.Order) []entity.
 		nodes = append(nodes, entity.Node[time.Duration]{
 			Id:             i + 2,
 			OriginalNode:   order.Consumer,
-			VisitStatus:    entity.VisitStatusUnVisited,
+			VisitStatus:    entity.VisitStatusUnVisitable,
 			GeoCoordinates: order.Consumer.GeoCoordinates,
 		})
 	}
 
 	return nodes
-}
-
-func constructConsumersMap(orders []entity.Order) map[int]map[int]bool {
-	consumerMap := make(map[int]map[int]bool)
-
-	for _, order := range orders {
-		consumersSet, ok := consumerMap[order.Restaurant.Id]
-		if !ok {
-			consumersSet = make(map[int]bool)
-		}
-		consumersSet[order.Consumer.Id] = true
-		consumerMap[order.Restaurant.Id] = consumersSet
-	}
-
-	return consumerMap
 }

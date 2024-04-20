@@ -3,10 +3,10 @@
 PACKAGES = $(shell go list ./... | grep -v -e . -e mocks | tr '\n' ',')
 
 build:
-	@go build -o bin/fact cmd/main.go
+	@go build -o bin/ src/cmd/main.go
 
 run: build
-	./bin/fact
+	.bin/
 
 test:
 	@if [ -f coverage.out ]; then rm coverage.out; fi;

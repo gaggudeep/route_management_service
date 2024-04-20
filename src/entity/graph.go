@@ -5,6 +5,7 @@ type VisitStatus int
 const (
 	VisitStatusUnVisited VisitStatus = iota
 	VisitStatusVisited
+	VisitStatusUnVisitable VisitStatus = iota
 )
 
 type Edge[T any] struct {
